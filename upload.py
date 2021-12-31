@@ -15,7 +15,7 @@ def df2section(df, sectionlist):
     subsectionls=sectionlist[:-1]
     for i,section in enumerate(subsectionls):
         # section pattern
-        section_pattern = '^(第\w?\w?\w'+section+')(.*)'
+        section_pattern = '^('+section+')(.*)'
         # section no and name
         section_no = 'section'+str(i)+'_no'
         section_name = 'section'+str(i)+'_name'
@@ -50,18 +50,21 @@ def df2section(df, sectionlist):
         df[section_name].fillna(method='ffill',inplace=True)
     # st.write(df)
     # last section
-    section_pattern = '^(第\w?\w?\w'+sectionlist[-1]+')(.*)'
+    section_pattern = '^('+sectionlist[-1]+')(.*)'
     df['tiao']=df['item'].str.extract(section_pattern)[0]
     df['txt']=df['item'].str.extract(section_pattern)[1]
     df['txt'].fillna(df['item'],inplace=True)
     df['tiao'].fillna(method='ffill',inplace=True)
     # st.write(df)
+    # initialize section value list
+    sectionls=dict()
     # exclude row with section name
     for i,section in enumerate(subsectionls):
-        section_pattern = '^第\w?\w?\w'+section
+        section_pattern = '^'+section
+        sectionls[section]=df[df['txt'].str.contains(section_pattern)]['txt'].tolist()
         df=df[~df['txt'].str.contains(section_pattern)]
     # st.write(df)
-    return df
+    return df,sectionls
 
 
 # group by section
@@ -85,14 +88,20 @@ def groupbysection(df, sectionlist):
         section_name = 'section'+str(i)+'_name'
         dfout['section']=dfout['section']+dfout[section_no]+' '+dfout[section_name]+'/'
     dfout['section']=dfout['section']+dfout['tiao']
-    return dfout    
+    # get tiao list
+    tiaolist=dfout['tiao'].tolist()
+    return dfout,tiaolist
 
 
 # exclude row by exclude list
 def exclude_row(df, exclude_list):
-    for exclude in exclude_list:
+    # exclude row by exclude list
+    exlist=dict()
+    for exclude in exclude_list:       
+        # get contain exclude item list
+        exlist[exclude]=df[df['item'].str.contains(exclude)]['item'].tolist()
         df=df[~df['item'].str.contains(exclude)]
-    return df
+    return df,exlist
 
 
 def savedf(txtlist, filename):
