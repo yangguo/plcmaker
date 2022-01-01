@@ -1,11 +1,9 @@
 import os
 import pandas as pd
-import streamlit as st
 import numpy as np
 
-from utils import get_csvdf, get_embedding,roformer_encoder
+from utils import roformer_encoder
 
-import glob
 
 uploadfolder = 'uploads'
 
@@ -22,16 +20,12 @@ def df2section(df, sectionlist):
         df[section_no]=df['item'].str.extract(section_pattern)[0]
         df[section_name]=df['item'].str.extract(section_pattern)[1]
     
-    # st.write(df)
     # reverse order of subsectionls
     revsubsectionls=subsectionls[::-1]
-    # st.write(revsubsectionls)
     # exclude last item
     revsubsectionls=revsubsectionls[:-1]
-    # st.write(revsubsectionls)
-   # for in reverse range order
+    # for in reverse range order
     for i in range(len(revsubsectionls)):
-        # st.write(i)
         # section no and name
         section_no = 'section'+str(i)+'_no'
         section_name = 'section'+str(i)+'_name'
@@ -41,21 +35,18 @@ def df2section(df, sectionlist):
         # fillna with last section no and name
         df[next_section_no].fillna(df[section_no], inplace=True)
         df[next_section_name].fillna(df[section_name], inplace=True)
-    # st.write(df)
     # fillna with all subsection no and name
     for i,section in enumerate(subsectionls):
         section_no = 'section'+str(i)+'_no'
         section_name = 'section'+str(i)+'_name'
         df[section_no].fillna(method='ffill',inplace=True)
         df[section_name].fillna(method='ffill',inplace=True)
-    # st.write(df)
     # last section
     section_pattern = '^('+sectionlist[-1]+')(.*)'
     df['tiao']=df['item'].str.extract(section_pattern)[0]
     df['txt']=df['item'].str.extract(section_pattern)[1]
     df['txt'].fillna(df['item'],inplace=True)
     df['tiao'].fillna(method='ffill',inplace=True)
-    # st.write(df)
     # initialize section value list
     sectionls=dict()
     # exclude row with section name
@@ -63,7 +54,6 @@ def df2section(df, sectionlist):
         section_pattern = '^'+section
         sectionls[section]=df[df['txt'].str.contains(section_pattern)]['txt'].tolist()
         df=df[~df['txt'].str.contains(section_pattern)]
-    # st.write(df)
     return df,sectionls
 
 
@@ -104,36 +94,19 @@ def exclude_row(df, exclude_list):
     return df,exlist
 
 
-def savedf(txtlist, filename):
-    df = pd.DataFrame(txtlist)
-    df.columns = ['item']
-    # print(df)
-    # df['制度'] = filename
-    # df['结构'] = df.index
+def savedf(df, filename):
     basename = filename.split('.')[0]
     savename = basename + '.csv'
     savepath = os.path.join(uploadfolder, savename)
-    # df.to_csv(savepath)
-    return df
+    df.to_csv(savepath)
 
 
-def txt2df(filename, text):
-    itemlist = text.replace(' ', '').split('\n')
+def txt2df(text):
+    itemlist = text.replace(' ', '').replace('\u3000', '').replace('\u2002','').split('\n')
     dflist = [item for item in itemlist if len(item) > 0]
-    # print(dflist)
-    df=savedf(dflist, filename)
+    df = pd.DataFrame(dflist)
+    df.columns = ['item']
     return df   
-
-
-def get_txtdf():
-    fileslist = glob.glob(uploadfolder + '**/*.txt', recursive=True)
-    # get csv file name list
-    csvfiles = get_csvfilelist()
-    for filepath in fileslist:
-        # get file name
-        name = getfilename(filepath)
-        if name not in csvfiles:
-            txt2df(name, filepath)
 
 
 # return corpus_embeddings
@@ -142,92 +115,38 @@ def getfilename(file):
     name = filename.split('.')[0]
     return name
 
+
 def sent2emb(sents):
     embls=[]
-    count=0
     for sent in sents:
         sentence_embedding=roformer_encoder(sent)
         embls.append(sentence_embedding)    
-        # print(count)
-        count+=1
     all_embeddings=np.concatenate(embls)
     return all_embeddings
 
-def file2embedding(file):
-    df=pd.read_csv(file)
-    sentences=df['item'].tolist()
-#     sentence_embeddings=roformer_encoder(sentences)
+
+def df2embedding(df):
+    sentences=df['txt'].tolist()
     all_embeddings=sent2emb(sentences)
-    name=getfilename(file)
+    return all_embeddings
+
+
+# save embedding
+def saveembedding(embeddings,name):
     savename=name+'.npy'
-#     all_embeddings = np.array(sentence_embeddings)    
-    np.save(savename, all_embeddings)
+    savepath = os.path.join(uploadfolder, savename)
+    np.save(savepath, embeddings)
 
 
-def encode_plclist():
-    files = glob.glob(uploadfolder + '**/*.csv', recursive=True)
-    # get npy file name list
-    npyfiles = get_npyfilelist()
-    for file in files:
-        # get file name
-        name = getfilename(file)
-        # check if file is not in npy file list
-        if name not in npyfiles:
-            try:
-                file2embedding(file)
-            except Exception as e:
-                st.error(str(e))
 
 
-# get npy file name list
-def get_npyfilelist():
-    files2 = glob.glob(uploadfolder + '**/*.npy', recursive=True)
-    filelist = []
-    for file in files2:
-        name = getfilename(file)
-        filelist.append(name)
-    return filelist
 
 
-# get csv file name list
-def get_csvfilelist():
-    files2 = glob.glob(uploadfolder + '**/*.csv', recursive=True)
-    filelist = []
-    for file in files2:
-        name = getfilename(file)
-        filelist.append(name)
-    return filelist
 
 
-def get_upload_data(plc_list):
-    plcdf = get_csvdf(uploadfolder)
-    selectdf = plcdf[plcdf['监管要求'].isin(plc_list)]
-    emblist = selectdf['监管要求'].unique().tolist()
-    plc_encode = get_embedding(uploadfolder, emblist)
-    return selectdf, plc_encode
 
 
-def save_uploadedfile(uploadedfile):
-    with open(os.path.join(uploadfolder, uploadedfile.name), "wb") as f:
-        f.write(uploadedfile.getbuffer())
-    return st.success("上传文件:{} 成功。".format(uploadedfile.name))
 
 
-def get_uploadfiles():
-    fileslist = glob.glob(uploadfolder + '/*.csv', recursive=True)
-    filenamels = []
-    for filepath in fileslist:
-        filename = os.path.basename(filepath)
-        name = filename.split('.')[0]
-        filenamels.append(name)
-    return filenamels
 
 
-def remove_uploadfiles():
-    files = glob.glob(uploadfolder + '/*.*', recursive=True)
-
-    for f in files:
-        try:
-            os.remove(f)
-        except OSError as e:
-            st.error("Error: %s : %s" % (f, e.strerror))
