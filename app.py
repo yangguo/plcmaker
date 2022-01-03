@@ -11,10 +11,13 @@ def main():
     plc_text = st.text_area('Input Text')
 
     section_input = st.sidebar.text_input('Input Section Pattern List',
-                                          value='第\w章 第\w节 第\w?\w?\w条')
+                                          value='第\w章 第\w节 第\w??\w?\w条')
     # input exclude text list
     exclude_text = st.sidebar.text_input('Input Exclude Text Pattern List',
                                          value='^\d\d?$')
+
+    # checkbox for embedding
+    embedding_checkbox = st.sidebar.checkbox('Embedding', value=False)
 
     if st.sidebar.button('Convert'):
         # check if plc_name and plc_text are empty
@@ -62,15 +65,16 @@ def main():
             # save df as csv
             savedf(df3, plc_name)
             
-            with st.spinner('Embedding...'):
-                embeddings=df2embedding(df3)
-                st.sidebar.success('Embedding Done!')
+            if embedding_checkbox:
+                with st.spinner('Embedding...'):
+                    embeddings=df2embedding(df3)
+                    st.sidebar.success('Embedding Done!')
 
-                # download embedding
-                st.sidebar.download_button(label='Download Embeddings',data=embeddings.tobytes(),file_name=plc_name+'_embedding.npy',mime='application/octet-stream')
+                    # download embedding
+                    st.sidebar.download_button(label='Download Embeddings',data=embeddings.tobytes(),file_name=plc_name+'_embedding.npy',mime='application/octet-stream')
 
-                # save embedding
-                saveembedding(embeddings,plc_name)
+                    # save embedding
+                    saveembedding(embeddings,plc_name)
 
 if __name__ == '__main__':
     main()
