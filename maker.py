@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import numpy as np
 
-from utils import roformer_encoder
+# from utils import roformer_encoder
 
 
 uploadfolder = 'uploads'
@@ -116,26 +116,35 @@ def getfilename(file):
     return name
 
 
-def sent2emb(sents):
-    embls=[]
-    for sent in sents:
-        sentence_embedding=roformer_encoder(sent)
-        embls.append(sentence_embedding)    
-    all_embeddings=np.concatenate(embls)
-    return all_embeddings
+def savedf2csv(df, filename, folder):
+    basename = filename.split(".")[0]
+    savename = basename + ".csv"
+    # make folder if not exist
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    savepath = os.path.join(folder, savename)
+    df.to_csv(savepath)
+
+# def sent2emb(sents):
+#     embls=[]
+#     for sent in sents:
+#         sentence_embedding=roformer_encoder(sent)
+#         embls.append(sentence_embedding)    
+#     all_embeddings=np.concatenate(embls)
+#     return all_embeddings
 
 
-def df2embedding(df):
-    sentences=df['txt'].tolist()
-    all_embeddings=sent2emb(sentences)
-    return all_embeddings
+# def df2embedding(df):
+#     sentences=df['txt'].tolist()
+#     all_embeddings=sent2emb(sentences)
+#     return all_embeddings
 
 
-# save embedding
-def saveembedding(embeddings,name):
-    savename=name+'.npy'
-    savepath = os.path.join(uploadfolder, savename)
-    np.save(savepath, embeddings)
+# # save embedding
+# def saveembedding(embeddings,name):
+#     savename=name+'.npy'
+#     savepath = os.path.join(uploadfolder, savename)
+#     np.save(savepath, embeddings)
 
 
 
