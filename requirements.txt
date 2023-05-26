@@ -1,4 +1,6 @@
-transformers
-torch
-pandas
-rjieba
+openai
+supabase
+streamlit
+langchain
+python-dotenv
+huggingface_hub

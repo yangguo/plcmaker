@@ -4,7 +4,7 @@ import json
 
 import pandas as pd
 import streamlit as st
-from streamlit_echarts import st_echarts
+# from streamlit_echarts import st_echarts
 
 from gptfuc import industry_name_to_code, init_supabase
 from utils import split_words,get_rulefolder,get_csvdf
