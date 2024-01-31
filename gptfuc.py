@@ -1,63 +1,14 @@
-# from langchain.llms import OpenAI
 import json
 import os
 
-import openai
-
-# import chromadb
-# import faiss
 import pandas as pd
 import streamlit as st
 from dotenv import load_dotenv
-
-# from gpt_index import GPTSimpleVectorIndex, LLMPredictor, SimpleDirectoryReader
-from langchain.chains import RetrievalQA, VectorDBQA
-from langchain.chains.qa_with_sources import load_qa_with_sources_chain
-from langchain.chains.question_answering import load_qa_chain
-from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
-
-# from langchain.document_loaders import TextLoader
-from langchain.document_loaders import DirectoryLoader
-from langchain.embeddings import (
-    HuggingFaceEmbeddings,
-    HuggingFaceHubEmbeddings,
-    OpenAIEmbeddings,
-)
-
-# from langchain.indexes import VectorstoreIndexCreator
-from langchain.llms import OpenAIChat
-from langchain.prompts.chat import (
-    AIMessagePromptTemplate,
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-    SystemMessagePromptTemplate,
-)
-from langchain.schema import AIMessage, HumanMessage, SystemMessage
-from langchain.text_splitter import (
-    CharacterTextSplitter,
-    RecursiveCharacterTextSplitter,
-)
-from langchain.vectorstores import (
-    FAISS,
-    Chroma,
-    Milvus,
-    OpenSearchVectorSearch,
-    Pinecone,
-    Qdrant,
-    SupabaseVectorStore,
-)
+from langchain.vectorstores import SupabaseVectorStore
+from langchain_openai import AzureOpenAIEmbeddings
 from supabase import Client, create_client
 
-# import pinecone
-
-
 load_dotenv()
-
-
-# from chromadb.utils import embedding_functions
-
-
-# from qdrant_client.http.models import Filter, FieldCondition
 
 
 api_key = os.environ.get("OPENAI_API_KEY")
@@ -70,6 +21,11 @@ supabase_key = os.environ.get("SUPABASE_KEY")
 AZURE_BASE_URL = os.environ.get("AZURE_BASE_URL")
 AZURE_API_KEY = os.environ.get("AZURE_API_KEY")
 AZURE_DEPLOYMENT_NAME = os.environ.get("AZURE_DEPLOYMENT_NAME")
+AZURE_DEPLOYMENT_NAME_16K = os.environ.get("AZURE_DEPLOYMENT_NAME_16K")
+AZURE_DEPLOYMENT_NAME_GPT4 = os.environ.get("AZURE_DEPLOYMENT_NAME_GPT4")
+AZURE_DEPLOYMENT_NAME_GPT4_32K = os.environ.get("AZURE_DEPLOYMENT_NAME_GPT4_32K")
+AZURE_DEPLOYMENT_NAME_GPT4_TURBO = os.environ.get("AZURE_DEPLOYMENT_NAME_GPT4_TURBO")
+AZURE_DEPLOYMENT_NAME_EMBEDDING = os.environ.get("AZURE_DEPLOYMENT_NAME_EMBEDDING")
 
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY")
 PINECONE_API_ENV = os.environ.get("PINECONE_API_ENV")
@@ -77,22 +33,22 @@ PINECONE_API_ENV = os.environ.get("PINECONE_API_ENV")
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN")
 
 # model_name='shibing624/text2vec-base-chinese'
-model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+# model_name = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 # embeddings =HuggingFaceEmbeddings(model_name=model_name)
 # embeddings = OpenAIEmbeddings()
 
-embeddings = HuggingFaceHubEmbeddings(
-    repo_id=model_name,
-    task="feature-extraction",
-    huggingfacehub_api_token=HF_API_TOKEN,
+# embeddings = HuggingFaceHubEmbeddings(
+#     repo_id=model_name,
+#     task="feature-extraction",
+#     huggingfacehub_api_token=HF_API_TOKEN,
+# )
+
+embeddings_openai = AzureOpenAIEmbeddings(
+    azure_endpoint=AZURE_BASE_URL,
+    azure_deployment=AZURE_DEPLOYMENT_NAME_EMBEDDING,
+    openai_api_version="2023-08-01-preview",
+    openai_api_key=AZURE_API_KEY,
 )
-
-# openai.api_base="https://tiny-shadow-5144.vixt.workers.dev/v1"
-# openai.api_base="https://super-heart-4116.vixt.workers.dev/v1"
-openai.api_base = "https://az.139105.xyz/v1"
-
-# llm = ChatOpenAI(model_name=model_name )
-llm = ChatOpenAI(model_name=model_name, openai_api_key=AZURE_API_KEY)
 
 
 # use azure model
@@ -110,17 +66,6 @@ llm = ChatOpenAI(model_name=model_name, openai_api_key=AZURE_API_KEY)
 uploadfolder = "uploads"
 filerawfolder = "fileraw"
 fileidxfolder = "ruleidx"
-backendurl = "http://localhost:8000"
-
-# openai_api_key = os.environ.get("OPENAI_API_KEY")
-# if openai_api_key is None:
-#     print("请设置OPENAI_API_KEY")
-# else:
-#     print("已设置OPENAI_API_KEY" + openai_api_key)
-
-
-# initialize pinecone
-# pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_API_ENV)
 
 
 @st.cache_resource
@@ -138,7 +83,7 @@ def build_ruleindex(df, industry=""):
     The created index is saved to a file in the folder "fileidx".
     """
     collection_name = industry_name_to_code(industry)
-
+    print(collection_name)
     # get text list from df
     docs = df["条款"].tolist()
     # build metadata
@@ -206,7 +151,7 @@ def build_ruleindex(df, industry=""):
     # Create vector store from documents and save to supabase
     SupabaseVectorStore.from_texts(
         docs,
-        embeddings,
+        embeddings_openai,
         metadatas=metadata,
         client=supabase,
         table_name=collection_name,
@@ -276,7 +221,7 @@ def add_ruleindex(df, industry=""):
         client=supabase,
         table_name=collection_name,
         query_name="match_" + collection_name,
-        embedding=embeddings,
+        embedding=embeddings_openai,
     )
 
     # get text list from df
@@ -306,162 +251,6 @@ def add_ruleindex(df, industry=""):
 #     # get collection names
 #     collection_names = qdrant_client.list_aliases()
 #     return collection_names
-
-
-def gpt_answer(
-    question, chaintype="stuff", industry="", top_k=4, model_name="gpt-3.5-turbo"
-):
-    collection_name = industry_name_to_code(industry)
-    # get faiss client
-    # store = FAISS.load_local(fileidxfolder, OpenAIEmbeddings())
-
-    # get qdrant client
-    # qdrant_client = QdrantClient(host=qdrant_host)
-
-    # # get qdrant docsearch
-    # store = Qdrant(qdrant_client, collection_name=collection_name, embedding_function=embeddings.embed_query)
-
-    # embeddings = OpenAIEmbeddings()
-    # get chroma
-    # store = Chroma(
-    #     persist_directory=fileidxfolder,
-    #     embedding_function=embeddings,
-    #     collection_name=collection_name,
-    # )
-
-    # get pinecone
-    # index = pinecone.Index("ruledb")
-    # store = Pinecone(
-    #     index, embeddings.embed_query, text_key="text", namespace=collection_name
-    # )
-
-    # get supabase
-    store = SupabaseVectorStore(
-        client=supabase,
-        table_name=collection_name,
-        query_name="match_" + collection_name,
-        embedding=embeddings,
-    )
-
-    system_template = """Use the following pieces of context to answer the users question. 
-    If you don't know the answer, just say that you don't know, don't try to make up an answer.
-    ----------------
-    {context}"""
-    messages = [
-        SystemMessagePromptTemplate.from_template(system_template),
-        HumanMessagePromptTemplate.from_template("{question}"),
-    ]
-    prompt = ChatPromptTemplate.from_messages(messages)
-
-    chain_type_kwargs = {"prompt": prompt}
-    # llm = ChatOpenAI(model_name=model_name, max_tokens=512)
-    # user azure model
-    #     llm = AzureChatOpenAI(
-    #     openai_api_base=AZURE_BASE_URL,
-    #     openai_api_version="2023-03-15-preview",
-    #     deployment_name=AZURE_DEPLOYMENT_NAME,
-    #     openai_api_key=AZURE_API_KEY,
-    #     openai_api_type = "azure",
-    # )
-    # chain = VectorDBQA.from_chain_type(
-    receiver = store.as_retriever()
-    receiver.search_kwargs["k"] = top_k
-
-    chain = RetrievalQA.from_chain_type(
-        llm,
-        chain_type=chaintype,
-        # vectorstore=store,
-        retriever=receiver,
-        # k=top_k,
-        return_source_documents=True,
-        chain_type_kwargs=chain_type_kwargs,
-    )
-    result = chain({"query": question})
-
-    # docs = store.similarity_search(question)
-    # qa_chain=load_qa_with_sources_chain(llm,chain_type=chaintype)
-    # qa_chain=load_qa_chain(llm,chain_type=chaintype)
-    # result = qa_chain({"input_documents": docs, "question": question}, return_only_outputs=True)
-
-    answer = result["result"]
-    # sourcedf=None
-    source = result["source_documents"]
-    sourcedf = docs_to_df(source)
-    return answer, sourcedf
-
-
-def similarity_search(question, topk=4, industry="", items=[]):
-    collection_name = industry_name_to_code(industry)
-    # get faiss client
-    # store = FAISS.load_local(fileidxfolder, embeddings)
-
-    # get qdrant client
-    # qdrant_client = QdrantClient(host=qdrant_host)
-    # # get qdrant docsearch
-    # store = Qdrant(qdrant_client, collection_name=collection_name, embedding_function=embeddings.embed_query)
-
-    # get pinecone
-    # index = pinecone.Index("ruledb")
-    # store = Pinecone(
-    #     index, embeddings.embed_query, text_key="text", namespace=collection_name
-    # )
-    # get chroma
-    # store = Chroma(
-    #     persist_directory=fileidxfolder,
-    #     embedding_function=embeddings,
-    #     collection_name=collection_name,
-    # )
-
-    # collections = store._client.list_collections()
-    # for collection in collections:
-    #     print(collection.name)
-
-    # # get milvus
-    # store = Milvus(
-    # embedding_function=OpenAIEmbeddings(),
-    # connection_args={"host": "127.0.0.1", "port": "19530"},
-    # # collection_name=collection_name,
-    # # text_field="text",
-    # )
-    # print(collection_name)
-
-    # get supabase
-    store = SupabaseVectorStore(
-        client=supabase,
-        table_name=collection_name,
-        query_name="match_" + collection_name,
-        embedding=embeddings,
-    )
-    # print(store.table_name)
-
-    # List all collections
-    # collections = store.list_collections()
-
-    # print(collections)
-
-    filter_value = {"监管要求": "商业银行信息科技风险管理指引"}
-
-    # filter = convert_list_to_dict(items)
-    # print(filter)
-
-    # Convert dict to JSON
-    filter_json = json.dumps(filter_value)
-
-    # Filter by '监管要求' in metadata field
-    filterdata = (
-        supabase.table(collection_name)
-        .select("content,metadata")
-        .filter("metadata", "cs", filter_json)
-        .execute()
-    )
-
-    # load json
-    data_json = json.loads(filterdata.json())
-
-    # filter=filter_value
-    docs = store.similarity_search(query=question, k=topk)
-    df = docs_to_df(docs)
-    return df
 
 
 def delete_db(industry="", items=[]):
@@ -516,6 +305,12 @@ def industry_name_to_code(industry_name):
         return "futures"
     elif industry_name == "投行":
         return "invbank"
+    elif industry_name == "反洗钱":
+        return "aml"
+    elif industry_name == "医药":
+        return "pharma"
+    elif industry_name == "hkma":
+        return "hkma"
     else:
         return "other"
 
